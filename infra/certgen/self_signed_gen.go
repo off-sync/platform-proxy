@@ -1,31 +1,32 @@
-package certs
+package certgen
 
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/off-sync/platform-proxy/domain/certs"
 )
 
 // SelfSignedCertGen implements CertGen and generates self-signed certificates.
 type SelfSignedCertGen struct {
-	RSABits int
 }
 
-// NewSelfSignedCertGen creates a new self-signed certificate generator.
-func NewSelfSignedCertGen(rsaBits int) *SelfSignedCertGen {
-	return &SelfSignedCertGen{
-		RSABits: rsaBits,
-	}
+// NewSelfSigned creates a new self-signed certificate generator.
+func NewSelfSigned() *SelfSignedCertGen {
+	return &SelfSignedCertGen{}
 }
 
 // GenCert creates a self-signed certificate.
-func (g *SelfSignedCertGen) GenCert(domain string) (*tls.Certificate, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, g.RSABits)
+func (g *SelfSignedCertGen) GenCert(domain string, keyBits int) (*certs.Certificate, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, keyBits)
+	if err != nil {
+		return nil, err
+	}
 
 	notBefore := time.Now().UTC()
 
@@ -55,15 +56,15 @@ func (g *SelfSignedCertGen) GenCert(domain string) (*tls.Certificate, error) {
 		IsCA: true,
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	crtBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %v", err)
 	}
 
-	tlsCert := &tls.Certificate{
-		Certificate: [][]byte{derBytes},
-		PrivateKey:  priv,
-	}
+	keyBytes := x509.MarshalPKCS1PrivateKey(priv)
 
-	return tlsCert, nil
+	return &certs.Certificate{
+		Certificate: crtBytes,
+		PrivateKey:  keyBytes,
+	}, nil
 }
