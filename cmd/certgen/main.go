@@ -9,13 +9,15 @@ import (
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
 	certsCom "github.com/off-sync/platform-proxy/common/certs"
+	"github.com/off-sync/platform-proxy/common/logging"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	"github.com/off-sync/platform-proxy/infra/certgen"
 	"github.com/off-sync/platform-proxy/infra/certstore"
 	"github.com/off-sync/platform-proxy/infra/filesystem"
+	"github.com/xenolf/lego/acme"
 )
 
-var log = logrus.New()
+var log = logging.NewFromLogrus(logrus.New())
 
 var getCertQry *getcert.Qry
 var genCertCmd *gencert.Cmd
@@ -35,6 +37,9 @@ func init() {
 	if err != nil {
 		log.WithError(err).Fatal("creating ACME file system")
 	}
+
+	// ACME logger
+	acme.Logger = logging.NewStdLogAdapter(log)
 
 	certGen, err := certgen.NewAcme(acmeFS, certgen.LetsEncryptProductionEndpoint, "hosting@off-sync.com")
 	if err != nil {

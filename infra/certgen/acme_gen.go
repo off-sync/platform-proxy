@@ -10,7 +10,9 @@ import (
 
 	"net/url"
 
+	"github.com/off-sync/platform-proxy/app/interfaces"
 	certsCom "github.com/off-sync/platform-proxy/common/certs"
+	"github.com/off-sync/platform-proxy/common/logging"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	"github.com/off-sync/platform-proxy/infra/filesystem"
 	"github.com/xenolf/lego/acme"
@@ -64,6 +66,17 @@ func getEmailPath(acmeEndpoint, email string) string {
 	email = strings.Replace(email, ".", "_", -1)
 
 	return acmeEndpoint + "-" + email
+}
+
+// SetAcmeLogger sets the logger used by ACME clients.
+func SetAcmeLogger(log interfaces.Logger) error {
+	if log == nil {
+		return fmt.Errorf("missing logger")
+	}
+
+	acme.Logger = logging.NewStdLogAdapter(log)
+
+	return nil
 }
 
 // NewAcme creates a new ACME certificate generator. It creates and registers a new account
