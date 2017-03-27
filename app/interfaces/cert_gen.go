@@ -2,7 +2,7 @@ package interfaces
 
 import "github.com/off-sync/platform-proxy/domain/certs"
 
-// CertGen allows the creation of new certificates based on a domain name.
+// CertGen allows the creation of new certificates based on a list of domains.
 type CertGen interface {
-	GenCert(domain string, keyBits int) (*certs.Certificate, error)
+	GenCert(domains []string, keyBits int) (*certs.Certificate, error)
 }

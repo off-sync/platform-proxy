@@ -6,6 +6,6 @@ import (
 
 // CertSaver allows storage of certificates.
 type CertSaver interface {
-	// Save stores a certificate for a domain.
-	Save(domain string, crt *certs.Certificate) error
+	// Save stores a certificate for a list of domains.
+	Save(domains []string, crt *certs.Certificate) error
 }

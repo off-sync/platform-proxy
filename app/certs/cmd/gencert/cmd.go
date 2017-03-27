@@ -21,19 +21,19 @@ func New(gen interfaces.CertGen, svr interfaces.CertSaver) *Cmd {
 
 // Model defines the input for the Generate Certificate command.
 type Model struct {
-	Domain  string
+	Domains []string
 	KeyBits int
 }
 
 // Execute executes the Generate Certificate command.
 // It generates a new certificate for the domain and stores it.
 func (c *Cmd) Execute(model Model) (*certs.Certificate, error) {
-	crt, err := c.gen.GenCert(model.Domain, model.KeyBits)
+	crt, err := c.gen.GenCert(model.Domains, model.KeyBits)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.svr.Save(model.Domain, crt)
+	err = c.svr.Save(model.Domains, crt)
 	if err != nil {
 		return nil, err
 	}

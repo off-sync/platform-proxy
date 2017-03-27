@@ -6,7 +6,7 @@ import (
 
 // CertLoader allows the retrieval of certificates.
 type CertLoader interface {
-	// Load retrieves a certificate for a domain.
+	// Load retrieves a certificate for a list of domains.
 	// Returns a nil certificate if none is found.
-	Load(domain string) (*certs.Certificate, error)
+	Load(domains []string) (*certs.Certificate, error)
 }

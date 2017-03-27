@@ -1,4 +1,4 @@
-package certscommon
+package certs
 
 import (
 	"crypto/rsa"

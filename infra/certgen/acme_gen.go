@@ -10,7 +10,7 @@ import (
 
 	"net/url"
 
-	"github.com/off-sync/platform-proxy/common/certscommon"
+	certsCom "github.com/off-sync/platform-proxy/common/certs"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	"github.com/off-sync/platform-proxy/infra/filesystem"
 	"github.com/xenolf/lego/acme"
@@ -94,7 +94,7 @@ func NewAcme(fs filesystem.FileSystem, acmeEndpoint string, email string) (*Acme
 			return nil, err
 		}
 
-		keyBytes := certscommon.EncodeRSAPrivateKey(key)
+		keyBytes := certsCom.EncodeRSAPrivateKey(key)
 
 		if err := fs.WriteBytes(keyPath, keyBytes); err != nil {
 			return nil, err
@@ -106,7 +106,7 @@ func NewAcme(fs filesystem.FileSystem, acmeEndpoint string, email string) (*Acme
 			return nil, err
 		}
 
-		key, err = certscommon.DecodeRSAPrivateKey(keyBytes)
+		key, err = certsCom.DecodeRSAPrivateKey(keyBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -184,13 +184,13 @@ func NewAcme(fs filesystem.FileSystem, acmeEndpoint string, email string) (*Acme
 }
 
 // GenCert generates a certificate using the provided ACME endpoint.
-func (g *AcmeCertGen) GenCert(domain string, keyBits int) (*certs.Certificate, error) {
+func (g *AcmeCertGen) GenCert(domains []string, keyBits int) (*certs.Certificate, error) {
 	key, err := rsa.GenerateKey(rand.Reader, keyBits)
 	if err != nil {
 		return nil, fmt.Errorf("generating RSA private key: %s", err)
 	}
 
-	crt, failures := g.client.ObtainCertificate([]string{domain}, true, key, false)
+	crt, failures := g.client.ObtainCertificate(domains, true, key, false)
 	if len(failures) > 0 {
 		return nil, fmt.Errorf("obtaining certificates: %v", failures)
 	}

@@ -19,10 +19,10 @@ func New(ldr interfaces.CertLoader) *Qry {
 
 // Model defines the input for the Get Certificate query.
 type Model struct {
-	Domain string
+	Domains []string
 }
 
 // Execute performs the lookup of a certificate. Returns a nil certificate if not found.
 func (q *Qry) Execute(model Model) (*certs.Certificate, error) {
-	return q.ldr.Load(model.Domain)
+	return q.ldr.Load(model.Domains)
 }

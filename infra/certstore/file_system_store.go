@@ -27,6 +27,16 @@ const (
 	keySuffix  = "-key.pem"
 )
 
+func getDomainsPath(domains []string) string {
+	escaped := make([]string, len(domains))
+
+	for i, domain := range domains {
+		escaped[i] = getDomainPath(domain)
+	}
+
+	return strings.Join(escaped, "+")
+}
+
 func getDomainPath(domain string) string {
 	parts := strings.Split(domain, ".")
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
@@ -37,11 +47,11 @@ func getDomainPath(domain string) string {
 }
 
 // Load tries to retrieve a certificate for a domain. Returns a nil certificate if not found.
-func (s *FileSystemCertStore) Load(domain string) (*certs.Certificate, error) {
+func (s *FileSystemCertStore) Load(domains []string) (*certs.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	path := getDomainPath(domain)
+	path := getDomainsPath(domains)
 
 	certPath := path + certSuffix
 	if exists, err := s.fs.FileExists(certPath); !exists || err != nil {
@@ -70,11 +80,11 @@ func (s *FileSystemCertStore) Load(domain string) (*certs.Certificate, error) {
 }
 
 // Save stores a certificate for a domain for future retrieval.
-func (s *FileSystemCertStore) Save(domain string, crt *certs.Certificate) error {
+func (s *FileSystemCertStore) Save(domains []string, crt *certs.Certificate) error {
 	s.Lock()
 	defer s.Unlock()
 
-	path := getDomainPath(domain)
+	path := getDomainsPath(domains)
 
 	certPath := path + certSuffix
 	if err := s.fs.WriteBytes(certPath, crt.Certificate); err != nil {

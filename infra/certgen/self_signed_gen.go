@@ -22,7 +22,11 @@ func NewSelfSigned() *SelfSignedCertGen {
 }
 
 // GenCert creates a self-signed certificate.
-func (g *SelfSignedCertGen) GenCert(domain string, keyBits int) (*certs.Certificate, error) {
+func (g *SelfSignedCertGen) GenCert(domains []string, keyBits int) (*certs.Certificate, error) {
+	if len(domains) < 1 {
+		return nil, fmt.Errorf("domains missing: provide at least 1 domain")
+	}
+
 	priv, err := rsa.GenerateKey(rand.Reader, keyBits)
 	if err != nil {
 		return nil, err
@@ -42,7 +46,7 @@ func (g *SelfSignedCertGen) GenCert(domain string, keyBits int) (*certs.Certific
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"Off-Sync.com"},
-			CommonName:   domain,
+			CommonName:   domains[0],
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
@@ -51,7 +55,7 @@ func (g *SelfSignedCertGen) GenCert(domain string, keyBits int) (*certs.Certific
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 
-		DNSNames: []string{domain},
+		DNSNames: domains,
 
 		IsCA: true,
 	}

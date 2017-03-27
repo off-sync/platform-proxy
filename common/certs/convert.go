@@ -1,4 +1,4 @@
-package certscommon
+package certs
 
 import (
 	"crypto/tls"
@@ -6,12 +6,12 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"github.com/off-sync/platform-proxy/domain/certs"
+	certsDom "github.com/off-sync/platform-proxy/domain/certs"
 )
 
 // ConvertToTLS converts an internal certificate to the format
 // used by the crypto/tls package.
-func ConvertToTLS(crt *certs.Certificate) (*tls.Certificate, error) {
+func ConvertToTLS(crt *certsDom.Certificate) (*tls.Certificate, error) {
 	var certs [][]byte
 
 	var p *pem.Block
