@@ -24,7 +24,7 @@
             "host": "127.0.0.1",
             "program": "${workspaceRoot}/cmd/certgen",
             "env": {},
-            "args": [],
+            "args": ["bphorns-web-site.qa.off-sync.net"],
             "showLog": true
         },
         {

@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
 	certsCom "github.com/off-sync/platform-proxy/common/certs"
@@ -70,6 +72,23 @@ func main() {
 		log.Info("existing certificate found")
 
 		dumpCertificate(cert)
+
+		log.Info("saving to SimpleDB Certificate Store")
+
+		sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
+		if err != nil {
+			log.WithError(err).Fatal("creating new session")
+		}
+
+		simpleDBCertStore, err := certstore.NewSimpleDBCertStore(sess, "off-sync-qa-certificates")
+		if err != nil {
+			log.WithError(err).Fatal("creating new SimpleDB certificate store")
+		}
+
+		err = simpleDBCertStore.Save(domains, cert)
+		if err != nil {
+			log.WithError(err).Fatal("saving to SimpleDB certificate store")
+		}
 
 		return
 	}

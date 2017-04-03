@@ -14,12 +14,12 @@ import (
 var log = logrus.New()
 
 func main() {
-	sess, err := session.NewSession()
+	sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
 	if err != nil {
 		log.WithError(err).Fatal("creating new session")
 	}
 
-	ecsSvc := ecs.New(sess, &aws.Config{Region: aws.String("eu-west-1")})
+	ecsSvc := ecs.New(sess)
 
 	var p interfaces.ConfigProvider
 	p, err = awsecs.New(ecsSvc, "off-sync-qa")
