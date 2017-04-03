@@ -73,21 +73,21 @@ func main() {
 
 		dumpCertificate(cert)
 
-		log.Info("saving to SimpleDB Certificate Store")
+		log.Info("saving to DynamoDB Certificate Store")
 
 		sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
 		if err != nil {
 			log.WithError(err).Fatal("creating new session")
 		}
 
-		simpleDBCertStore, err := certstore.NewSimpleDBCertStore(sess, "off-sync-qa-certificates")
+		dynamoDBCertStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates")
 		if err != nil {
-			log.WithError(err).Fatal("creating new SimpleDB certificate store")
+			log.WithError(err).Fatal("creating new DynamoDB certificate store")
 		}
 
-		err = simpleDBCertStore.Save(domains, cert)
+		err = dynamoDBCertStore.Save(domains, cert)
 		if err != nil {
-			log.WithError(err).Fatal("saving to SimpleDB certificate store")
+			log.WithError(err).Fatal("saving to DynamoDB certificate store")
 		}
 
 		return
