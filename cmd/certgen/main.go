@@ -85,9 +85,14 @@ func main() {
 			log.WithError(err).Fatal("creating new DynamoDB certificate store")
 		}
 
+		err = dynamoDBCertStore.Save(domains, nil)
+		if err != nil {
+			log.WithError(err).Fatal("reserving in DynamoDB certificate store")
+		}
+
 		err = dynamoDBCertStore.Save(domains, cert)
 		if err != nil {
-			log.WithError(err).Fatal("saving to DynamoDB certificate store")
+			log.WithError(err).Fatal("updating to DynamoDB certificate store")
 		}
 
 		return
