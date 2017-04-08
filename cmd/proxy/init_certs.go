@@ -1,6 +1,9 @@
 package main
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
 	"github.com/off-sync/platform-proxy/infra/certgen"
@@ -13,12 +16,22 @@ var genCertCmd *gencert.Cmd
 
 func init() {
 	// create infra implementations
-	certFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\LocalCertStore"))
+	// certFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\LocalCertStore"))
+	// if err != nil {
+	// 	log.WithError(err).Fatal("creating certificates file system")
+	// }
+
+	// certStore := certstore.NewFileSystemCertStore(certFS)
+
+	sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
 	if err != nil {
-		log.WithError(err).Fatal("creating certificates file system")
+		log.WithError(err).Fatal("creating new session")
 	}
 
-	certStore := certstore.NewFileSystemCertStore(certFS)
+	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates")
+	if err != nil {
+		log.WithError(err).Fatal("creating new DynamodDB certificate store")
+	}
 
 	// certGen := certgen.NewSelfSigned()
 

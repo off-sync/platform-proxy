@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
+	"net/url"
 
 	"fmt"
 
@@ -11,6 +13,8 @@ import (
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
 	"github.com/off-sync/platform-proxy/common/certs"
+	"github.com/vulcand/oxy/forward"
+	"github.com/vulcand/oxy/roundrobin"
 )
 
 var log = logrus.New()
@@ -30,7 +34,7 @@ func main() {
 				WithField("domains", domains).
 				Info("generating certificate")
 
-			crt, err = genCertCmd.Execute(gencert.Model{Domains: domains, KeyBits: 4096})
+			crt, err = genCertCmd.Execute(gencert.Model{Domains: domains})
 			if err != nil {
 				return nil, err
 			}
@@ -48,7 +52,60 @@ func main() {
 		return tlsCrt, nil
 	}
 
+	backends, frontends, err := getConfigQry.Execute()
+	if err != nil {
+		log.WithError(err).Fatal("getting configuration")
+	}
+
 	r := mux.NewRouter()
+
+	backendHandlers := make(map[string]http.Handler)
+	for _, backend := range backends {
+		fwd, err := forward.New()
+		if err != nil {
+			log.WithError(err).Fatal("creating forwarder")
+		}
+
+		lb, err := roundrobin.New(fwd)
+		if err != nil {
+			log.WithError(err).Fatal("creating load balancer")
+		}
+
+		for _, server := range backend.Servers {
+			addrs, err := net.LookupHost(server.Hostname())
+			if err != nil {
+				log.
+					WithField("server", server).
+					WithError(err).
+					Fatal("looking up server host")
+			}
+
+			for _, addr := range addrs {
+				u := &url.URL{}
+				*u = *server
+				u.Host = fmt.Sprintf("%s:%s", addr, server.Port())
+
+				log.WithFields(logrus.Fields{
+					"server": server,
+					"addr":   u,
+				}).Info("adding server")
+
+				lb.UpsertServer(u)
+			}
+		}
+
+		backendHandlers[backend.Name] = lb
+	}
+
+	for _, frontend := range frontends {
+		handler, exists := backendHandlers[frontend.BackendName]
+		if !exists {
+			log.WithField("backend_name", frontend.BackendName).Fatal("unknown backend name")
+		}
+
+		r.Host(frontend.Domain).Handler(handler)
+	}
+
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<h1>%s</h1>\n<pre>", r.Host)
 

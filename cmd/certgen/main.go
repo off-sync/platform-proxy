@@ -26,12 +26,22 @@ var genCertCmd *gencert.Cmd
 
 func init() {
 	// create infra implementations
-	certFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\LocalCertStore"))
+	// certFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\LocalCertStore"))
+	// if err != nil {
+	// 	log.WithError(err).Fatal("creating certificates file system")
+	// }
+
+	//certStore := certstore.NewFileSystemCertStore(certFS)
+
+	sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
 	if err != nil {
-		log.WithError(err).Fatal("creating certificates file system")
+		log.WithError(err).Fatal("creating new session")
 	}
 
-	certStore := certstore.NewFileSystemCertStore(certFS)
+	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates")
+	if err != nil {
+		log.WithError(err).Fatal("creating new DynamodDB certificate store")
+	}
 
 	// certGen := certgen.NewSelfSigned()
 
@@ -70,39 +80,13 @@ func main() {
 
 	if cert != nil {
 		log.Info("existing certificate found")
+	} else {
+		log.Info("generating certificate")
 
-		dumpCertificate(cert)
-
-		log.Info("saving to DynamoDB Certificate Store")
-
-		sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
+		cert, err = genCertCmd.Execute(gencert.Model{Domains: domains})
 		if err != nil {
-			log.WithError(err).Fatal("creating new session")
+			log.WithError(err).Fatal("generating certificate")
 		}
-
-		dynamoDBCertStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates")
-		if err != nil {
-			log.WithError(err).Fatal("creating new DynamoDB certificate store")
-		}
-
-		_, err = dynamoDBCertStore.LoadOrGenerate(domains, nil)
-		if err != nil {
-			log.WithError(err).Fatal("reserving in DynamoDB certificate store")
-		}
-
-		err = dynamoDBCertStore.Save(domains, cert)
-		if err != nil {
-			log.WithError(err).Fatal("updating to DynamoDB certificate store")
-		}
-
-		return
-	}
-
-	log.Info("generating certificate")
-
-	cert, err = genCertCmd.Execute(gencert.Model{Domains: domains})
-	if err != nil {
-		log.WithError(err).Fatal("generating certificate")
 	}
 
 	dumpCertificate(cert)
