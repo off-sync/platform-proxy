@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/off-sync/platform-proxy/app/interfaces"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	"github.com/off-sync/platform-proxy/infra/filesystem"
 )
@@ -46,16 +47,26 @@ func getDomainPath(domain string) string {
 	return strings.Join(parts, "_")
 }
 
-// Load tries to retrieve a certificate for a domain. Returns a nil certificate if not found.
-func (s *FileSystemCertStore) Load(domains []string) (*certs.Certificate, error) {
+// LoadOrGenerate tries to retrieve a certificate for a domain.
+// It tries to generate one if not found and a generator is provided.
+func (s *FileSystemCertStore) LoadOrGenerate(domains []string, gen interfaces.CertGen) (*certs.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	path := getDomainsPath(domains)
 
 	certPath := path + certSuffix
-	if exists, err := s.fs.FileExists(certPath); !exists || err != nil {
+	exists, err := s.fs.FileExists(certPath)
+	if err != nil {
 		return nil, err
+	}
+
+	if !exists {
+		if gen == nil {
+			return nil, nil
+		}
+
+		return gen.GenCert(domains)
 	}
 
 	certBytes, err := s.fs.ReadBytes(certPath)

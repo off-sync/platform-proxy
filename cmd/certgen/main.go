@@ -85,7 +85,7 @@ func main() {
 			log.WithError(err).Fatal("creating new DynamoDB certificate store")
 		}
 
-		err = dynamoDBCertStore.Save(domains, nil)
+		_, err = dynamoDBCertStore.LoadOrGenerate(domains, nil)
 		if err != nil {
 			log.WithError(err).Fatal("reserving in DynamoDB certificate store")
 		}
@@ -100,7 +100,7 @@ func main() {
 
 	log.Info("generating certificate")
 
-	cert, err = genCertCmd.Execute(gencert.Model{Domains: domains, KeyBits: 4096})
+	cert, err = genCertCmd.Execute(gencert.Model{Domains: domains})
 	if err != nil {
 		log.WithError(err).Fatal("generating certificate")
 	}

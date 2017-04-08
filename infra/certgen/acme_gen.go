@@ -46,8 +46,9 @@ const (
 )
 
 type AcmeCertGen struct {
-	user   *AcmeUser
-	client *acme.Client
+	user    *AcmeUser
+	client  *acme.Client
+	keyBits int
 }
 
 const (
@@ -191,14 +192,15 @@ func NewAcme(fs filesystem.FileSystem, acmeEndpoint string, email string) (*Acme
 	acmeClient.ExcludeChallenges([]acme.Challenge{acme.TLSSNI01, acme.HTTP01})
 
 	return &AcmeCertGen{
-		user:   acmeUser,
-		client: acmeClient,
+		user:    acmeUser,
+		client:  acmeClient,
+		keyBits: 4096,
 	}, nil
 }
 
 // GenCert generates a certificate using the provided ACME endpoint.
-func (g *AcmeCertGen) GenCert(domains []string, keyBits int) (*certs.Certificate, error) {
-	key, err := rsa.GenerateKey(rand.Reader, keyBits)
+func (g *AcmeCertGen) GenCert(domains []string) (*certs.Certificate, error) {
+	key, err := rsa.GenerateKey(rand.Reader, g.keyBits)
 	if err != nil {
 		return nil, fmt.Errorf("generating RSA private key: %s", err)
 	}

@@ -17,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/cenkalti/backoff"
+	"github.com/off-sync/platform-proxy/app/interfaces"
 	commonCerts "github.com/off-sync/platform-proxy/common/certs"
 	"github.com/off-sync/platform-proxy/domain/certs"
 )
@@ -24,6 +26,7 @@ import (
 var (
 	errUnableToReserveCertificate = errors.New("unable to reserve certificate")
 	errUnableToUpdateCertificate  = errors.New("unable to update certificate")
+	errCertificateIsReserved      = errors.New("certificate is reserved")
 )
 
 type DynamoDBCertStore struct {
@@ -186,37 +189,34 @@ func (s *DynamoDBCertStore) reserveCert(domains []string) (*dynamoDBCert, error)
 
 // updateCert tries to update an existing certificate in the store.
 // Returns errUnableToUpdateCertificate if it cannot update the certificate.
-func (s *DynamoDBCertStore) updateCert(crt *dynamoDBCert) error {
-	crt.Modified = time.Now().UTC()
+func (s *DynamoDBCertStore) updateCert(c *dynamoDBCert, crt *certs.Certificate) (err error) {
+	// update state to generated
+	c.State = dynamoDBCertStateGenerated
 
-	err := s.putCert(crt)
+	// copy the private key and certificate
+	c.PrivateKey = string(crt.PrivateKey)
+	c.Certificate = string(crt.Certificate)
+
+	// get expiry date from certificate
+	c.NotAfter, err = commonCerts.NotAfter(crt)
+	if err != nil {
+		return
+	}
+
+	err = s.putCert(c)
 	if err != nil {
 		if awsErr, isAws := err.(awserr.Error); isAws {
 			if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
-				return errUnableToUpdateCertificate
+				err = errUnableToUpdateCertificate
 			}
 		}
-
-		return err
 	}
 
-	return nil
+	return
 }
 
 // Save tries to save a certificate to the store. It is concurrent.
-// Providing a nil certificate creates a reservation in the store.
 func (s *DynamoDBCertStore) Save(domains []string, crt *certs.Certificate) error {
-	if crt == nil {
-		// make a reservation for this certificate
-		_, err := s.reserveCert(domains)
-		if err != nil && err == errUnableToReserveCertificate {
-			// this means that another routine created a reservation first, that's ok
-			return nil
-		}
-
-		return err
-	}
-
 	// check if there is an existing certificate in the store
 	c, err := s.getCert(domains)
 	if err != nil {
@@ -230,17 +230,69 @@ func (s *DynamoDBCertStore) Save(domains []string, crt *certs.Certificate) error
 		}
 	}
 
-	// we've received a non-nil certificate so update state to generated and
-	// copy the private key and certificate
-	c.State = dynamoDBCertStateGenerated
-	c.PrivateKey = string(crt.PrivateKey)
-	c.Certificate = string(crt.Certificate)
+	return s.updateCert(c, crt)
+}
 
-	// get expiry date from certificate
-	c.NotAfter, err = commonCerts.NotAfter(crt)
-	if err != nil {
-		return err
-	}
+// LoadOrGenerate tries to load an existing certificate from the store.
+// If it does not exists, it tries to make a reservation and then generates the certificate.
+func (s *DynamoDBCertStore) LoadOrGenerate(domains []string, gen interfaces.CertGen) (crt *certs.Certificate, err error) {
+	backOff := backoff.NewExponentialBackOff()
+	backOff.InitialInterval = 4 * time.Second
+	backOff.Multiplier = 2
+	backOff.MaxElapsedTime = 60 * time.Second
 
-	return s.putCert(c)
+	err = backoff.Retry(func() error {
+		// check if there is an existing certificate in the store
+		c, err := s.getCert(domains)
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+
+		if c != nil {
+			if c.State == dynamoDBCertStateReserved {
+				// there is an existing certificate, but it is reserverd -> retry
+				return errCertificateIsReserved
+			}
+
+			// copy private key and certificate to return
+			crt = &certs.Certificate{
+				PrivateKey:  []byte(c.PrivateKey),
+				Certificate: []byte(c.Certificate),
+			}
+
+			return nil
+		}
+
+		if gen == nil {
+			// no generator provided so we're done
+			return nil
+		}
+
+		// certificate does not exist yet, make a reservation for this certificate before generating
+		c, err = s.reserveCert(domains)
+		if err != nil {
+			if err == errUnableToReserveCertificate {
+				// another process is probably generating the certificate, not permanent so retry
+				return err
+			}
+
+			return backoff.Permanent(err)
+		}
+
+		// we got the reservation so generate a new certificate
+		crt, err = gen.GenCert(domains)
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+
+		// update the certificate in the store
+		err = s.updateCert(c, crt)
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+
+		return nil
+	}, backOff)
+
+	return
 }
