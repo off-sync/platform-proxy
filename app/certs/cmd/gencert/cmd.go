@@ -27,12 +27,17 @@ type Model struct {
 // Execute executes the Generate Certificate command.
 // It generates a new certificate for the domain and stores it.
 func (c *Cmd) Execute(model Model) (*certs.Certificate, error) {
+	token, err := c.svr.ClaimSaveToken(model.Domains)
+	if err != nil {
+		return nil, err
+	}
+
 	crt, err := c.gen.GenCert(model.Domains)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.svr.Save(model.Domains, crt)
+	err = c.svr.Save(model.Domains, token, crt)
 	if err != nil {
 		return nil, err
 	}

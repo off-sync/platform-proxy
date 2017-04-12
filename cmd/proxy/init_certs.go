@@ -9,6 +9,7 @@ import (
 	"github.com/off-sync/platform-proxy/infra/certgen"
 	"github.com/off-sync/platform-proxy/infra/certstore"
 	"github.com/off-sync/platform-proxy/infra/filesystem"
+	"github.com/off-sync/platform-proxy/infra/time"
 )
 
 var getCertQry *getcert.Qry
@@ -28,7 +29,7 @@ func init() {
 		log.WithError(err).Fatal("creating new session")
 	}
 
-	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates")
+	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates", time.NewSystemTime())
 	if err != nil {
 		log.WithError(err).Fatal("creating new DynamodDB certificate store")
 	}

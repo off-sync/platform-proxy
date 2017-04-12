@@ -17,13 +17,5 @@ func New(cfgUpdater interfaces.ConfigUpdater) *Cmd {
 
 // Execute executes the Update Config command.
 func (c *Cmd) Execute(model *Model) error {
-	c.cfgUpdater.RemoveAllSites()
-
-	for _, site := range model.Sites {
-		if err := c.cfgUpdater.AddSite(site); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return c.cfgUpdater.Update(model.Backends, model.Frontends)
 }

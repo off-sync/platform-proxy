@@ -47,9 +47,9 @@ func getDomainPath(domain string) string {
 	return strings.Join(parts, "_")
 }
 
-// LoadOrGenerate tries to retrieve a certificate for a domain.
-// It tries to generate one if not found and a generator is provided.
-func (s *FileSystemCertStore) LoadOrGenerate(domains []string, gen interfaces.CertGen) (*certs.Certificate, error) {
+// Load tries to retrieve a certificate for a domain.
+// Returns a nil certificate if it does not exist.
+func (s *FileSystemCertStore) Load(domains []string) (*certs.Certificate, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -62,11 +62,7 @@ func (s *FileSystemCertStore) LoadOrGenerate(domains []string, gen interfaces.Ce
 	}
 
 	if !exists {
-		if gen == nil {
-			return nil, nil
-		}
-
-		return gen.GenCert(domains)
+		return nil, nil
 	}
 
 	certBytes, err := s.fs.ReadBytes(certPath)
@@ -90,8 +86,14 @@ func (s *FileSystemCertStore) LoadOrGenerate(domains []string, gen interfaces.Ce
 	}, nil
 }
 
+// ClaimSaveToken returns a token that can be used for saving a certificate.
+func (s *FileSystemCertStore) ClaimSaveToken(domains []string) (interfaces.CertSaveToken, error) {
+	return "", nil
+}
+
 // Save stores a certificate for a domain for future retrieval.
-func (s *FileSystemCertStore) Save(domains []string, crt *certs.Certificate) error {
+// Any token can be provided as this store is not concurrent-safe.
+func (s *FileSystemCertStore) Save(domains []string, token interfaces.CertSaveToken, crt *certs.Certificate) error {
 	s.Lock()
 	defer s.Unlock()
 

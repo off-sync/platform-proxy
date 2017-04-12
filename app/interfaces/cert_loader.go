@@ -6,8 +6,7 @@ import (
 
 // CertLoader allows the retrieval of certificates.
 type CertLoader interface {
-	// LoadOrGenerate tries to retrieve a certificate for a list of domains.
-	// If it does not exist yet, the provide certificate generator is used to
-	// create a new certificate.
-	LoadOrGenerate(domains []string, gen CertGen) (*certs.Certificate, error)
+	// Load tries to retrieve a certificate for a list of domains.
+	// It returns a nil certificate if it does not exist.
+	Load(domains []string) (*certs.Certificate, error)
 }

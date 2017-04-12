@@ -24,5 +24,5 @@ type Model struct {
 
 // Execute performs the lookup of a certificate. Returns a nil certificate if not found.
 func (q *Qry) Execute(model Model) (*certs.Certificate, error) {
-	return q.ldr.LoadOrGenerate(model.Domains, nil)
+	return q.ldr.Load(model.Domains)
 }
