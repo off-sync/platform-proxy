@@ -205,10 +205,10 @@ func (s *DynamoDBCertStore) putCert(crt *dynamoDBCert) error {
 		crt.Modified = now
 
 		// check that the save tokens match
-		item.ConditionExpression = aws.String("(SaveToken = :saveToken) and (SaveTokenExpiresAt < :saveTokenExpiresAt)")
+		item.ConditionExpression = aws.String("(SaveToken = :saveToken) and (SaveTokenExpiresAt > :now)")
 		item.ExpressionAttributeValues = map[string]*dynamodb.AttributeValue{
-			":saveToken":          stringAttr(crt.SaveToken),
-			":saveTokenExpiresAt": timeAttr(now),
+			":saveToken": stringAttr(crt.SaveToken),
+			":now":       timeAttr(now),
 		}
 	}
 
