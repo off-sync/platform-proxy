@@ -13,11 +13,10 @@ import (
 	certsCom "github.com/off-sync/platform-proxy/common/certs"
 	"github.com/off-sync/platform-proxy/common/logging"
 	"github.com/off-sync/platform-proxy/domain/certs"
+	"github.com/off-sync/platform-proxy/infra/acmestore"
 	"github.com/off-sync/platform-proxy/infra/certgen"
 	"github.com/off-sync/platform-proxy/infra/certstore"
-	"github.com/off-sync/platform-proxy/infra/filesystem"
 	"github.com/off-sync/platform-proxy/infra/time"
-	"github.com/xenolf/lego/acme"
 )
 
 var log = logging.NewFromLogrus(logrus.New())
@@ -46,15 +45,17 @@ func init() {
 
 	// certGen := certgen.NewSelfSigned()
 
-	acmeFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\AcmeFS"))
+	acmeStore, err := acmestore.NewDynamoDBACMEStore(sess, "off-sync-qa-acme-account")
 	if err != nil {
-		log.WithError(err).Fatal("creating ACME file system")
+		log.WithError(err).Fatal("creating new DynamodDB ACME store")
 	}
 
-	// ACME logger
-	acme.Logger = logging.NewStdLogAdapter(log)
+	acmeAccount, err := acmeStore.Load(certgen.LetsEncryptProductionEndpoint, "hosting@off-sync.com")
+	if err != nil {
+		log.WithError(err).Fatal("loading ACME account")
+	}
 
-	certGen, err := certgen.NewAcme(acmeFS, certgen.LetsEncryptProductionEndpoint, "hosting@off-sync.com")
+	certGen, err := certgen.NewLegoACMECertGen(acmeAccount, log)
 	if err != nil {
 		panic(err)
 	}

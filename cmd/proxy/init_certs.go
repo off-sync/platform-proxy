@@ -6,9 +6,9 @@ import (
 
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
+	"github.com/off-sync/platform-proxy/infra/acmestore"
 	"github.com/off-sync/platform-proxy/infra/certgen"
 	"github.com/off-sync/platform-proxy/infra/certstore"
-	"github.com/off-sync/platform-proxy/infra/filesystem"
 	"github.com/off-sync/platform-proxy/infra/time"
 )
 
@@ -36,12 +36,17 @@ func init() {
 
 	// certGen := certgen.NewSelfSigned()
 
-	acmeFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\AcmeFS"))
+	acmeStore, err := acmestore.NewDynamoDBACMEStore(sess, "off-sync-qa-acme-account")
 	if err != nil {
-		log.WithError(err).Fatal("creating ACME file system")
+		log.WithError(err).Fatal("creating new DynamodDB ACME store")
 	}
 
-	certGen, err := certgen.NewAcme(acmeFS, certgen.LetsEncryptProductionEndpoint, "hosting@off-sync.com")
+	acmeAccount, err := acmeStore.Load(certgen.LetsEncryptProductionEndpoint, "hosting@off-sync.com")
+	if err != nil {
+		log.WithError(err).Fatal("loading ACME account")
+	}
+
+	certGen, err := certgen.NewLegoACMECertGen(acmeAccount, log)
 	if err != nil {
 		panic(err)
 	}

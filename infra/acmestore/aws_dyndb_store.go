@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/off-sync/platform-proxy/common/dyndbutil"
 	"github.com/off-sync/platform-proxy/domain/acme"
@@ -16,6 +17,24 @@ import (
 type DynamoDBACMEStore struct {
 	dyndbSvc  *dynamodb.DynamoDB
 	tableName string
+}
+
+// NewDynamoDBACMEStore creates a new DynamoDB ACME store.
+// It creates an AWS DynamoDB client and verifies whether the provided table exists.
+func NewDynamoDBACMEStore(p client.ConfigProvider, tableName string) (*DynamoDBACMEStore, error) {
+	dyndbSvc := dynamodb.New(p)
+
+	_, err := dyndbSvc.DescribeTable(&dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &DynamoDBACMEStore{
+		dyndbSvc:  dyndbSvc,
+		tableName: tableName,
+	}, nil
 }
 
 func (s *DynamoDBACMEStore) getItem(accountKey string, attrs ...string) (*dynamodb.GetItemOutput, error) {

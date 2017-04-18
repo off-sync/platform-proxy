@@ -13,11 +13,12 @@ import (
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
 	"github.com/off-sync/platform-proxy/common/certs"
+	"github.com/off-sync/platform-proxy/common/logging"
 	"github.com/vulcand/oxy/forward"
 	"github.com/vulcand/oxy/roundrobin"
 )
 
-var log = logrus.New()
+var log = logging.NewFromLogrus(logrus.New())
 
 func main() {
 	getCertificateFunc := func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -85,10 +86,10 @@ func main() {
 				*u = *server
 				u.Host = fmt.Sprintf("%s:%s", addr, server.Port())
 
-				log.WithFields(logrus.Fields{
-					"server": server,
-					"addr":   u,
-				}).Info("adding server")
+				log.
+					WithField("server", server).
+					WithField("addr", u).
+					Info("adding server")
 
 				lb.UpsertServer(u)
 			}
