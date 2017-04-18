@@ -2,7 +2,6 @@ package certstore
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/off-sync/platform-proxy/app/interfaces"
 	commonCerts "github.com/off-sync/platform-proxy/common/certs"
+	"github.com/off-sync/platform-proxy/common/dyndbutil"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	uuid "github.com/satori/go.uuid"
 )
@@ -93,7 +93,7 @@ func (s *DynamoDBCertStore) getItem(hash string, attrs ...string) (*dynamodb.Get
 	return s.dyndbSvc.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]*dynamodb.AttributeValue{
-			"Hash": &dynamodb.AttributeValue{S: aws.String(hash)},
+			"Hash": dyndbutil.StringAttr(hash),
 		},
 		AttributesToGet: aws.StringSlice(attrs),
 	})
@@ -103,47 +103,6 @@ func (s *DynamoDBCertStore) putItem(item *dynamodb.PutItemInput) error {
 	item.TableName = aws.String(s.tableName)
 	_, err := s.dyndbSvc.PutItem(item)
 	return err
-}
-
-func stringAttr(s string) *dynamodb.AttributeValue {
-	if s == "" {
-		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}
-	}
-
-	return &dynamodb.AttributeValue{S: aws.String(s)}
-}
-
-func stringValue(a *dynamodb.AttributeValue) string {
-	if aws.BoolValue(a.NULL) {
-		return ""
-	}
-
-	return aws.StringValue(a.S)
-}
-
-func stringListAttr(s []string) *dynamodb.AttributeValue {
-	return &dynamodb.AttributeValue{SS: aws.StringSlice(s)}
-}
-
-func timeAttr(t time.Time) *dynamodb.AttributeValue {
-	if t.IsZero() {
-		return &dynamodb.AttributeValue{NULL: aws.Bool(true)}
-	}
-
-	return &dynamodb.AttributeValue{N: aws.String(strconv.FormatInt(t.UTC().Unix(), 10))}
-}
-
-func timeValue(a *dynamodb.AttributeValue) (time.Time, error) {
-	if aws.BoolValue(a.NULL) {
-		return time.Time{}, nil
-	}
-
-	s, err := strconv.ParseInt(aws.StringValue(a.N), 10, 64)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return time.Unix(s, 0), nil
 }
 
 func (s *DynamoDBCertStore) getCert(domains []string) (*dynamoDBCert, error) {
@@ -161,25 +120,25 @@ func (s *DynamoDBCertStore) getCert(domains []string) (*dynamoDBCert, error) {
 		return nil, nil
 	}
 
-	c.SaveToken = stringValue(i.Item["SaveToken"])
-	c.SaveTokenExpiresAt, err = timeValue(i.Item["SaveTokenExpiresAt"])
+	c.SaveToken = dyndbutil.StringValue(i.Item["SaveToken"])
+	c.SaveTokenExpiresAt, err = dyndbutil.TimeValue(i.Item["SaveTokenExpiresAt"])
 	if err != nil {
 		return nil, err
 	}
 
-	c.Created, err = timeValue(i.Item["Created"])
+	c.Created, err = dyndbutil.TimeValue(i.Item["Created"])
 	if err != nil {
 		return nil, err
 	}
 
-	c.Modified, err = timeValue(i.Item["Modified"])
+	c.Modified, err = dyndbutil.TimeValue(i.Item["Modified"])
 	if err != nil {
 		return nil, err
 	}
 
-	c.PrivateKey = stringValue(i.Item["PrivateKey"])
-	c.Certificate = stringValue(i.Item["Certificate"])
-	c.NotAfter, err = timeValue(i.Item["NotAfter"])
+	c.PrivateKey = dyndbutil.StringValue(i.Item["PrivateKey"])
+	c.Certificate = dyndbutil.StringValue(i.Item["Certificate"])
+	c.NotAfter, err = dyndbutil.TimeValue(i.Item["NotAfter"])
 	if err != nil {
 		return nil, err
 	}
@@ -207,21 +166,21 @@ func (s *DynamoDBCertStore) putCert(crt *dynamoDBCert) error {
 		// check that the save tokens match
 		item.ConditionExpression = aws.String("(SaveToken = :saveToken) and (SaveTokenExpiresAt > :now)")
 		item.ExpressionAttributeValues = map[string]*dynamodb.AttributeValue{
-			":saveToken": stringAttr(crt.SaveToken),
-			":now":       timeAttr(now),
+			":saveToken": dyndbutil.StringAttr(crt.SaveToken),
+			":now":       dyndbutil.TimeAttr(now),
 		}
 	}
 
 	item.Item = map[string]*dynamodb.AttributeValue{
-		"Hash":               stringAttr(crt.hash()),
-		"Domains":            stringListAttr(crt.Domains),
-		"SaveToken":          stringAttr(crt.SaveToken),
-		"SaveTokenExpiresAt": timeAttr(crt.SaveTokenExpiresAt),
-		"Created":            timeAttr(crt.Created),
-		"Modified":           timeAttr(crt.Modified),
-		"PrivateKey":         stringAttr(crt.PrivateKey),
-		"Certificate":        stringAttr(crt.Certificate),
-		"NotAfter":           timeAttr(crt.NotAfter),
+		"Hash":               dyndbutil.StringAttr(crt.hash()),
+		"Domains":            dyndbutil.StringListAttr(crt.Domains),
+		"SaveToken":          dyndbutil.StringAttr(crt.SaveToken),
+		"SaveTokenExpiresAt": dyndbutil.TimeAttr(crt.SaveTokenExpiresAt),
+		"Created":            dyndbutil.TimeAttr(crt.Created),
+		"Modified":           dyndbutil.TimeAttr(crt.Modified),
+		"PrivateKey":         dyndbutil.StringAttr(crt.PrivateKey),
+		"Certificate":        dyndbutil.StringAttr(crt.Certificate),
+		"NotAfter":           dyndbutil.TimeAttr(crt.NotAfter),
 	}
 
 	return s.putItem(item)
