@@ -23,7 +23,7 @@ func main() {
 
 	frontends, err := getFrontends.Execute(nil)
 	if err != nil {
-		log.WithError(err).Fatal("getting backends")
+		log.WithError(err).Fatal("getting frontends")
 	}
 
 	for _, frontend := range frontends.Frontends {
@@ -31,5 +31,22 @@ func main() {
 			WithField("domain_name", frontend.DomainName).
 			WithField("service_name", frontend.ServiceName).
 			Info("frontend")
+	}
+
+	getServices, err := infraaws.NewEcsGetServicesQuery(sess, "off-sync-qa")
+	if err != nil {
+		log.WithError(err).Fatal("creating ECS GetServices query")
+	}
+
+	services, err := getServices.Execute(nil)
+	if err != nil {
+		log.WithError(err).Fatal("getting services")
+	}
+
+	for _, service := range services.Services {
+		log.
+			WithField("name", service.Name).
+			WithField("servers", service.Servers).
+			Info("service")
 	}
 }
