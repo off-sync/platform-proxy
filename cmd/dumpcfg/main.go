@@ -1,14 +1,11 @@
 package main
 
 import (
-	"net"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ecs"
-	"github.com/off-sync/platform-proxy/app/interfaces"
-	"github.com/off-sync/platform-proxy/infra/awsecs"
+
+	"github.com/off-sync/platform-proxy/infra/infraaws"
 )
 
 var log = logrus.New()
@@ -19,50 +16,20 @@ func main() {
 		log.WithError(err).Fatal("creating new session")
 	}
 
-	ecsSvc := ecs.New(sess)
-
-	var p interfaces.ConfigProvider
-	p, err = awsecs.New(ecsSvc, "off-sync-qa")
+	getFrontends, err := infraaws.NewDynamoDBGetFrontendsQuery(sess, "off-sync-qa-frontends")
 	if err != nil {
-		log.WithError(err).Fatal("creating AWS ECS config provider")
+		log.WithError(err).Fatal("creating DynamoDB GetFrontends query")
 	}
 
-	backends, err := p.GetBackends()
+	frontends, err := getFrontends.Execute(nil)
 	if err != nil {
 		log.WithError(err).Fatal("getting backends")
 	}
 
-	for _, backend := range backends {
+	for _, frontend := range frontends.Frontends {
 		log.
-			WithField("name", backend.Name).
-			WithField("servers", backend.Servers).
-			Info("backend configuration")
-
-		for _, server := range backend.Servers {
-			addrs, err := net.LookupHost(server.Hostname())
-			if err != nil {
-				log.
-					WithField("server", server).
-					WithError(err).
-					Fatal("looking up server host")
-			}
-
-			log.
-				WithField("server", server).
-				WithField("addrs", addrs).
-				Info("server hostname lookup successful")
-		}
-	}
-
-	frontends, err := p.GetFrontends()
-	if err != nil {
-		log.WithError(err).Fatal("getting backends")
-	}
-
-	for _, frontend := range frontends {
-		log.
-			WithField("domain", frontend.Domain).
-			WithField("backend_name", frontend.BackendName).
-			Info("frontend configuration")
+			WithField("domain_name", frontend.DomainName).
+			WithField("service_name", frontend.ServiceName).
+			Info("frontend")
 	}
 }
