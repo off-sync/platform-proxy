@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"crypto/x509"
 
@@ -10,40 +11,33 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/off-sync/platform-proxy/app/certs/cmd/gencert"
 	"github.com/off-sync/platform-proxy/app/certs/qry/getcert"
+	"github.com/off-sync/platform-proxy/app/frontends/cmd/setcertificate"
 	certsCom "github.com/off-sync/platform-proxy/common/certs"
 	"github.com/off-sync/platform-proxy/common/logging"
 	"github.com/off-sync/platform-proxy/domain/certs"
 	"github.com/off-sync/platform-proxy/infra/acmestore"
 	"github.com/off-sync/platform-proxy/infra/certgen"
 	"github.com/off-sync/platform-proxy/infra/certstore"
-	"github.com/off-sync/platform-proxy/infra/time"
+	"github.com/off-sync/platform-proxy/infra/infraaws"
+	infraTime "github.com/off-sync/platform-proxy/infra/time"
 )
 
 var log = logging.NewFromLogrus(logrus.New())
 
 var getCertQry *getcert.Qry
 var genCertCmd *gencert.Cmd
+var setCertificateCommand setcertificate.Command
 
 func init() {
-	// create infra implementations
-	// certFS, err := filesystem.NewLocalFileSystem(filesystem.Root("C:\\Temp\\LocalCertStore"))
-	// if err != nil {
-	// 	log.WithError(err).Fatal("creating certificates file system")
-	// }
-
-	//certStore := certstore.NewFileSystemCertStore(certFS)
-
 	sess, err := session.NewSession(&aws.Config{Region: aws.String("eu-west-1")})
 	if err != nil {
 		log.WithError(err).Fatal("creating new session")
 	}
 
-	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates", time.NewSystemTime())
+	certStore, err := certstore.NewDynamoDBCertStore(sess, "off-sync-qa-certificates", infraTime.NewSystemTime())
 	if err != nil {
 		log.WithError(err).Fatal("creating new DynamodDB certificate store")
 	}
-
-	// certGen := certgen.NewSelfSigned()
 
 	acmeStore, err := acmestore.NewDynamoDBACMEStore(sess, "off-sync-qa-acme-account")
 	if err != nil {
@@ -63,19 +57,25 @@ func init() {
 	// create certificate commands and queries
 	getCertQry = getcert.New(certStore)
 	genCertCmd = gencert.New(certGen, certStore)
+
+	setCertificateCommand, err = infraaws.NewDynamoDBSetCertificateCommand(sess, "off-sync-qa-frontends")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {
-	domains := os.Args[1:]
-	if len(domains) < 1 {
-		log.Fatal("missing domains: provide at least 1")
+	if len(os.Args) != 2 {
+		log.Fatal("invalid arguments: specify exactly 1 domain name")
 	}
 
+	domainName := os.Args[1]
+
 	log.
-		WithField("domains", domains).
+		WithField("domain_name", domainName).
 		Info("checking certificate store")
 
-	cert, err := getCertQry.Execute(getcert.Model{Domains: domains})
+	cert, err := getCertQry.Execute(getcert.Model{Domains: []string{domainName}})
 	if err != nil {
 		log.WithError(err).Fatal("checking certificate store")
 	}
@@ -85,25 +85,41 @@ func main() {
 	} else {
 		log.Info("generating certificate")
 
-		cert, err = genCertCmd.Execute(gencert.Model{Domains: domains})
+		cert, err = genCertCmd.Execute(gencert.Model{Domains: []string{domainName}})
 		if err != nil {
 			log.WithError(err).Fatal("generating certificate")
 		}
 	}
 
-	dumpCertificate(cert)
+	certificateExpiresAt := dumpCertificate(cert)
+
+	err = setCertificateCommand.Execute(&setcertificate.CommandModel{
+		DomainName:           domainName,
+		Certificate:          string(cert.Certificate),
+		PrivateKey:           string(cert.PrivateKey),
+		CertificateExpiresAt: certificateExpiresAt,
+	})
+	if err != nil {
+		log.WithError(err).Fatal("setting frontend certificate")
+	}
 }
 
-func dumpCertificate(cert *certs.Certificate) {
+func dumpCertificate(cert *certs.Certificate) time.Time {
 	tlsCert, err := certsCom.ConvertToTLS(cert)
 	if err != nil {
 		log.WithError(err).Fatal("converting certificate")
 	}
 
-	for _, asn1Data := range tlsCert.Certificate {
+	var t time.Time
+
+	for i, asn1Data := range tlsCert.Certificate {
 		c, err := x509.ParseCertificate(asn1Data)
 		if err != nil {
 			log.WithError(err).Error("parsing certificate")
+		}
+
+		if i == 0 {
+			t = c.NotAfter
 		}
 
 		log.
@@ -113,4 +129,6 @@ func dumpCertificate(cert *certs.Certificate) {
 			WithField("not_after", c.NotAfter).
 			Info("certificate")
 	}
+
+	return t
 }
