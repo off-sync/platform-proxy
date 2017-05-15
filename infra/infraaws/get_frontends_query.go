@@ -1,6 +1,8 @@
 package infraaws
 
 import (
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
@@ -31,6 +33,14 @@ func NewDynamoDBGetFrontendsQuery(p client.ConfigProvider, tableName string) (*D
 	}, nil
 }
 
+type frontendItem struct {
+	DomainName           string                     `dynamodbav:"DomainName"`
+	Certificate          string                     `dynamodbav:"Certificate"`
+	PrivateKey           string                     `dynamodbav:"PrivateKey"`
+	CertificateExpiresAt dynamodbattribute.UnixTime `dynamodbav:"CertificateExpiresAt"`
+	ServiceName          string                     `dynamodbav:"ServiceName"`
+}
+
 func (q *DynamoDBGetFrontendsQuery) Execute(model *getfrontends.QueryModel) (*getfrontends.ResultModel, error) {
 	result := &getfrontends.ResultModel{
 		Frontends: []*frontends.Frontend{},
@@ -41,16 +51,24 @@ func (q *DynamoDBGetFrontendsQuery) Execute(model *getfrontends.QueryModel) (*ge
 	err := q.dyndbSvc.ScanPages(&dynamodb.ScanInput{
 		TableName: aws.String(q.tableName),
 	}, func(page *dynamodb.ScanOutput, last bool) bool {
-		frontends := []*frontends.Frontend{}
+		frontendItems := []*frontendItem{}
 
-		err := dynamodbattribute.UnmarshalListOfMaps(page.Items, &frontends)
+		err := dynamodbattribute.UnmarshalListOfMaps(page.Items, &frontendItems)
 		if err != nil {
 			unmarshalErr = err
 
 			return false
 		}
 
-		result.Frontends = append(result.Frontends, frontends...)
+		for _, i := range frontendItems {
+			result.Frontends = append(result.Frontends, &frontends.Frontend{
+				DomainName:           i.DomainName,
+				Certificate:          i.Certificate,
+				PrivateKey:           i.PrivateKey,
+				CertificateExpiresAt: time.Time(i.CertificateExpiresAt),
+				ServiceName:          i.ServiceName,
+			})
+		}
 
 		return true
 	})
