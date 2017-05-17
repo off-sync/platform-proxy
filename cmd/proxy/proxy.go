@@ -35,6 +35,8 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	router := p.router
 	p.RUnlock()
 
+	w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
 	router.ServeHTTP(w, r)
 }
 

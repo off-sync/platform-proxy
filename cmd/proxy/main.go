@@ -7,10 +7,20 @@ import (
 	"net/url"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/off-sync/platform-proxy/app/interfaces"
 	"github.com/off-sync/platform-proxy/common/logging"
 )
 
-var log = logging.NewFromLogrus(logrus.New())
+var log interfaces.Logger
+
+func init() {
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+
+	logr := logrus.New()
+	logr.Formatter = &logrus.JSONFormatter{}
+
+	log = logging.NewFromLogrus(logr)
+}
 
 func main() {
 	proxy := newProxy()
@@ -47,6 +57,8 @@ func main() {
 				WithField("request_url", r.URL).
 				WithField("redirect_url", url).
 				Info("redirecting")
+
+			w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
 
 			http.Redirect(w, r, url.String(), http.StatusMovedPermanently)
 		}),
