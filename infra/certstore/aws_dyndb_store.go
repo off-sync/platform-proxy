@@ -163,8 +163,8 @@ func (s *DynamoDBCertStore) putCert(crt *dynamoDBCert) error {
 		// already exists: set modified
 		crt.Modified = now
 
-		// check that the save tokens match
-		item.ConditionExpression = aws.String("(SaveToken = :saveToken) and (SaveTokenExpiresAt > :now)")
+		// check that the save token is expired, or match
+		item.ConditionExpression = aws.String("(SaveTokenExpiresAt <= :now) or (SaveToken = :saveToken)")
 		item.ExpressionAttributeValues = map[string]*dynamodb.AttributeValue{
 			":saveToken": dyndbutil.StringAttr(crt.SaveToken),
 			":now":       dyndbutil.TimeAttr(now),
@@ -204,7 +204,7 @@ func (s *DynamoDBCertStore) ClaimSaveToken(domains []string) (interfaces.CertSav
 
 	now := s.time.Now()
 
-	if c.SaveToken != "" && c.SaveTokenExpiresAt.Before(now) {
+	if c.SaveToken != "" && c.SaveTokenExpiresAt.After(now) {
 		// non-expired save token present: return ErrTokenAlreadyClaimed
 		return "", interfaces.ErrTokenAlreadyClaimed
 	}
