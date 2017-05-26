@@ -65,17 +65,17 @@ func init() {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatal("invalid arguments: specify exactly 1 domain name")
+	if len(os.Args) < 2 {
+		log.Fatal("invalid arguments: specify at least 1 domain name")
 	}
 
-	domainName := os.Args[1]
+	domainNames := os.Args[1:]
 
 	log.
-		WithField("domain_name", domainName).
+		WithField("domain_names", domainNames).
 		Info("checking certificate store")
 
-	cert, err := getCertQry.Execute(getcert.Model{Domains: []string{domainName}})
+	cert, err := getCertQry.Execute(getcert.Model{Domains: domainNames})
 	if err != nil {
 		log.WithError(err).Fatal("checking certificate store")
 	}
@@ -85,7 +85,7 @@ func main() {
 	} else {
 		log.Info("generating certificate")
 
-		cert, err = genCertCmd.Execute(gencert.Model{Domains: []string{domainName}})
+		cert, err = genCertCmd.Execute(gencert.Model{Domains: domainNames})
 		if err != nil {
 			log.WithError(err).Fatal("generating certificate")
 		}
@@ -94,7 +94,7 @@ func main() {
 	certificateExpiresAt := dumpCertificate(cert)
 
 	err = setCertificateCommand.Execute(&setcertificate.CommandModel{
-		DomainName:           domainName,
+		DomainName:           domainNames[0],
 		Certificate:          string(cert.Certificate),
 		PrivateKey:           string(cert.PrivateKey),
 		CertificateExpiresAt: certificateExpiresAt,
