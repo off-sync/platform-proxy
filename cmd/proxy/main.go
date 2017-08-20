@@ -6,7 +6,7 @@ import (
 
 	"net/url"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/off-sync/platform-proxy/app/interfaces"
 	"github.com/off-sync/platform-proxy/common/logging"
 )
